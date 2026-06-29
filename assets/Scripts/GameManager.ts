@@ -33,6 +33,7 @@ export class GameManager extends Component
     private _road: BlockType[] = [];
     private goldNum: number = 0; // 绝赞地块数量
     private goldGet: number = 0; // 已获取绝赞地块数量
+    private probGold: string[] = [];
 
     @property({ type: Node })
     public startMenu: Node | null = null; // 开始UI
@@ -109,6 +110,7 @@ export class GameManager extends Component
         this._road = [];
         // startPos
         this._road.push(BlockType.BT_STONE);
+        this.probGold[0] = "StartPos";
 
         // 生成随机路面
         for (let i = 1; i < this.roadLength; i++)
@@ -119,6 +121,7 @@ export class GameManager extends Component
                 this._road.push(Math.floor(Math.random() * 2));
         }
         this._road[this.roadLength] = BlockType.BT_END;
+        this.probGold[this.roadLength] = "EndPos";
 
         // 随机添加绝赞地块
         this.goldNum = 0;
@@ -127,34 +130,28 @@ export class GameManager extends Component
                 switch (box)
                 {
                     case BlockType.BT_STONE:
-                        return 10;
+                        return 25;
                     case BlockType.BT_GOLD:
-                        return -10;
+                        return -15;
                     case BlockType.BT_END:
                         return 15;
                     default:
-                        return 0;
+                        return -10;
                 }
             };
-        let probGold: string[] = [];
         for (let k = 1; k < this.roadLength; k++)
         {
             if (this._road[k] === BlockType.BT_NONE)
                 continue;
-            let posWeight = (k / 2) * 100 / this.roadLength;
+            let posWeight = (k / this.roadLength) * 10 + 10; // 位置权重, [10, 20]
             
             let weight = Math.min(calcWeight(this._road[k - 1]) + calcWeight(this._road[k + 1]), 80);
 
             let ranNum = Math.random() * 100;
             let box = ranNum < posWeight + weight ? BlockType.BT_GOLD : this._road[k];
-            probGold[k] = `${posWeight} + ${weight} = ${posWeight + weight} | ranNum: ${ranNum} | box: ${box}`;
+            this.probGold[k] = `${posWeight} + ${weight} = ${posWeight + weight} | ranNum: ${ranNum} | ${k}-box: ${box}`;
             this.goldNum += box === BlockType.BT_GOLD ? 1 : 0;
             this._road[k] = box;
-        }
-        if (this.debugMode)
-        {
-            for (let b of probGold)
-                console.log(`${b}\n`);
         }
         
 
@@ -221,6 +218,9 @@ export class GameManager extends Component
             this.rank.string = this.rankAcc.string = ""; // 重置评级文本
         if (this.EndTitle)
             this.EndTitle.string = ""; // 重置结束标题文本
+
+        if (this.debugMode)
+            this.printDebugInfo();
 
         setTimeout(() =>
         {      //直接设置active会直接开始监听鼠标事件，做了一下延迟处理
@@ -290,6 +290,12 @@ export class GameManager extends Component
             }
 
         }, this.EndTitleAnim.getState("EndTitleMove").duration + 500);
+    }
+
+    printDebugInfo()
+    {
+        for (let b of this.probGold)
+            console.log(`${b === undefined ? "AIR" : b}\n`);
     }
 
     onStartButtonClicked()

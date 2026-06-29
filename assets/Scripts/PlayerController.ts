@@ -1,4 +1,4 @@
-import { _decorator, Animation, Component, EventMouse, input, Input, log, Node, Vec3 } from 'cc';
+import { _decorator, Animation, Component, EventMouse, EventTouch, input, Input, log, Node, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 export const BLOCK_SIZE = 40;
@@ -20,21 +20,39 @@ export class PlayerController extends Component
     @property(Animation)
     BodyAnim: Animation = null;
 
+    @property({ type: Node })
+    leftTouch: Node | null = null;
+    @property({ type: Node })
+    rightTouch: Node | null = null;
+
     start() 
     {
         // input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
     }
-    setInputActive(active: boolean)
+    setInputActive(active: boolean) // PC端适配
     {
         if (active)
         {
-            input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+            input.on(Input.EventType.MOUSE_DOWN, this.onMouseUp, this);
         }
         else
         {
-            input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+            input.off(Input.EventType.MOUSE_DOWN, this.onMouseUp, this);
         }
     }
+    // setInputActive(active: boolean) // 移动设备适配
+    // {
+    //     if (active)
+    //     {
+    //         this.leftTouch?.on(Input.EventType.TOUCH_START, this.onTouch, this);
+    //         this.rightTouch?.on(Input.EventType.TOUCH_START, this.onTouch, this);
+    //     }
+    //     else
+    //     {
+    //         this.leftTouch?.off(Input.EventType.TOUCH_START, this.onTouch, this);
+    //         this.rightTouch?.off(Input.EventType.TOUCH_START, this.onTouch, this);
+    //     }
+    // }
 
     onMouseUp(event: EventMouse)
     {
@@ -45,6 +63,19 @@ export class PlayerController extends Component
         catch (e)
         {
             console.log(e);
+        }
+    }
+
+    onTouch(event: EventTouch)
+    {
+        const target = event.target as Node;
+        if (target?.name == 'LeftTouch')
+        {
+            this.jumpByStep(1);
+        }
+        else
+        {
+            this.jumpByStep(2);
         }
     }
 
