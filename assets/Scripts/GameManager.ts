@@ -147,8 +147,8 @@ export class GameManager extends Component
             this.goldNum += box === BlockType.BT_GOLD ? 1 : 0;
             this._road[k] = box;
         }
-        for (let b of probGold)
-            console.log(`${b}\n`);
+        // for (let b of probGold)
+        //     console.log(`${b}\n`);
 
         // 创建地图
         for (let j = 0; j < this._road.length; j++)
