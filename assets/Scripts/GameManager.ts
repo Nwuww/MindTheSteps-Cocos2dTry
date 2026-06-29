@@ -51,6 +51,9 @@ export class GameManager extends Component
     public StartButton: Label | null = null; // 开始按钮
     @property({ type: Label })
     public ResetButton: Label | null = null; // 重置按钮
+    @property({ type: Label })
+    public debugModeButton: Label | null = null; // 调试模式按钮
+    private debugMode: boolean = false; // 调试模式开关
 
     @property({ type: Label })
     public EndTitle: Label | null = null; // 结束标题
@@ -69,6 +72,7 @@ export class GameManager extends Component
 
     start()
     {
+        this.debugMode = false;
         this.setCurState(GameState.GS_INIT);
         this.playerCtrl?.node.on('JumpEnd', this.onPlayerJumpEnd, this);
     }
@@ -147,8 +151,12 @@ export class GameManager extends Component
             this.goldNum += box === BlockType.BT_GOLD ? 1 : 0;
             this._road[k] = box;
         }
-        // for (let b of probGold)
-        //     console.log(`${b}\n`);
+        if (this.debugMode)
+        {
+            for (let b of probGold)
+                console.log(`${b}\n`);
+        }
+        
 
         // 创建地图
         for (let j = 0; j < this._road.length; j++)
@@ -331,6 +339,17 @@ export class GameManager extends Component
             this.stepsLabel.string = '' + (moveIndex >= this.roadLength ? this.roadLength : moveIndex);
         }
         this.checkResult(moveIndex);
+    }
+
+    onDebugModeButtonClicked()
+    {
+        this.debugMode = !this.debugMode;
+        if (this.debugModeButton)
+        {
+            this.debugModeButton.string = this.debugMode ? "Debug[O]" : "Debug[X]";
+            this.debugModeButton.color = this.debugMode ? new math.Color(125, 125, 125, 255) :
+                                                             new math.Color(65, 65, 65, 255);
+        }
     }
 
     checkResult(moveIndex: number)
