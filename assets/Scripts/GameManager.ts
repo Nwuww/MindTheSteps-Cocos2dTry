@@ -118,12 +118,7 @@ export class GameManager extends Component
 
         // 随机添加绝赞地块
         this.goldNum = 0;
-        for (let k = 1; k < this.roadLength; k++)
-        {
-            if (this._road[k] === BlockType.BT_NONE)
-                continue;
-            let weight = (k / 2) * 100 / this.roadLength;
-            let calcWeight = (box) => 
+        let calcWeight = (box) => 
             {
                 switch (box)
                 {
@@ -137,11 +132,23 @@ export class GameManager extends Component
                         return 0;
                 }
             };
-            weight = Math.min(weight + calcWeight(this._road[k - 1]) + calcWeight(this._road[k + 1]), 100);
-            let box = Math.random() * 100 < weight ? BlockType.BT_GOLD : this._road[k];
+        let probGold: string[] = [];
+        for (let k = 1; k < this.roadLength; k++)
+        {
+            if (this._road[k] === BlockType.BT_NONE)
+                continue;
+            let posWeight = (k / 2) * 100 / this.roadLength;
+            
+            let weight = Math.min(calcWeight(this._road[k - 1]) + calcWeight(this._road[k + 1]), 80);
+
+            let ranNum = Math.random() * 100;
+            let box = ranNum < posWeight + weight ? BlockType.BT_GOLD : this._road[k];
+            probGold[k] = `${posWeight} + ${weight} = ${posWeight + weight} | ranNum: ${ranNum} | box: ${box}`;
             this.goldNum += box === BlockType.BT_GOLD ? 1 : 0;
             this._road[k] = box;
         }
+        for (let b of probGold)
+            console.log(`${b}\n`);
 
         // 创建地图
         for (let j = 0; j < this._road.length; j++)
