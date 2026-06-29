@@ -1,0 +1,14 @@
+{
+  "name": "Tutorial-steps",
+  "uuid": "c5666f94-aa92-4fbd-9ffb-b4705b315fb7",
+  "creator": {
+    "version": "3.8.8",
+    "registry": {
+      "remote": {}
+    },
+    "dependencies": {
+      "localization-editor": "1.0.4",
+      "plugin-import-2x": "1.1.10"
+    }
+  }
+}
