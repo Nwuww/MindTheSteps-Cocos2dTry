@@ -1,4 +1,4 @@
-import { _decorator, Button, CCInteger, Component, instantiate, Label, math, Node, Prefab, Vec3, Animation } from 'cc';
+import { _decorator, Button, CCInteger, Component, instantiate, Label, math, Node, Prefab, Vec3, Animation, UITransform, AudioSource, AudioClip } from 'cc';
 import { BLOCK_SIZE, PlayerController } from './PlayerController';
 import { ColorKey } from '../../extensions/plugin-import-2x/creator/components/ColorKey';
 const { ccclass, property } = _decorator;
@@ -33,6 +33,7 @@ export class GameManager extends Component
     private _road: BlockType[] = [];
     private goldNum: number = 0; // 绝赞地块数量
     private goldGet: number = 0; // 已获取绝赞地块数量
+    private probGold: string[] = [];
 
     @property({ type: Node })
     public startMenu: Node | null = null; // 开始UI
@@ -51,6 +52,9 @@ export class GameManager extends Component
     public StartButton: Label | null = null; // 开始按钮
     @property({ type: Label })
     public ResetButton: Label | null = null; // 重置按钮
+    @property({ type: Label })
+    public debugModeButton: Label | null = null; // 调试模式按钮
+    private debugMode: boolean = false; // 调试模式开关
 
     @property({ type: Label })
     public EndTitle: Label | null = null; // 结束标题
@@ -67,10 +71,46 @@ export class GameManager extends Component
     public rankAcc: Label | null = null; // 评级数值文本
     private rankAccVal: number = 0; // 评级数值%
 
+    @property(AudioSource)
+    public bgm: AudioSource | null = null; // bgm
+    @property({ type: Label })
+    public bgmControl: Label | null = null; // bgm播放暂停
+    private isBGMPlaying: boolean = true;
+
     start()
     {
+        this.debugMode = false;
         this.setCurState(GameState.GS_INIT);
+        this.ChangeResolution(1920, 1080);
+        this.BMGControl(true);
         this.playerCtrl?.node.on('JumpEnd', this.onPlayerJumpEnd, this);
+    }
+
+    BMGControl(isBGMON: boolean, volume: number = 1)
+    {
+        this.isBGMPlaying = isBGMON;
+        this.bgm.volume = volume;
+        if (isBGMON)
+        {
+            this.bgm.play();
+            this.bgmControl.string = "BGM[O]";
+            this.bgmControl.color = new math.Color(125, 125, 125, 255);
+        }
+        else
+        {
+            this.bgm.pause();
+            this.bgmControl.string = "BGM[X]";
+            this.bgmControl.color = new math.Color(65, 65, 65, 255);
+        }
+    }
+
+    ChangeResolution(width: number, height: number, anchorX?: number, anchorY?: number)
+    {
+        const uiTransform = this.getComponent(UITransform);
+        uiTransform.width = 200;
+        uiTransform.height = 120;
+        uiTransform.anchorX = anchorX !== undefined ? anchorX : 0;
+        uiTransform.anchorY = anchorY !== undefined ? anchorY : 0.5;
     }
 
     spawnBlockByType(type: BlockType)
@@ -105,6 +145,7 @@ export class GameManager extends Component
         this._road = [];
         // startPos
         this._road.push(BlockType.BT_STONE);
+        this.probGold[0] = "StartPos";
 
         // 生成随机路面
         for (let i = 1; i < this.roadLength; i++)
@@ -115,33 +156,39 @@ export class GameManager extends Component
                 this._road.push(Math.floor(Math.random() * 2));
         }
         this._road[this.roadLength] = BlockType.BT_END;
+        this.probGold[this.roadLength] = "EndPos";
 
         // 随机添加绝赞地块
         this.goldNum = 0;
+        let calcWeight = (box) => 
+        {
+            switch (box)
+            {
+                case BlockType.BT_STONE:
+                    return 25;
+                case BlockType.BT_GOLD:
+                    return -15;
+                case BlockType.BT_END:
+                    return 15;
+                default:
+                    return -10;
+            }
+        };
         for (let k = 1; k < this.roadLength; k++)
         {
             if (this._road[k] === BlockType.BT_NONE)
                 continue;
-            let weight = (k / 2) * 100 / this.roadLength;
-            let calcWeight = (box) => 
-            {
-                switch (box)
-                {
-                    case BlockType.BT_STONE:
-                        return 10;
-                    case BlockType.BT_GOLD:
-                        return -10;
-                    case BlockType.BT_END:
-                        return 15;
-                    default:
-                        return 0;
-                }
-            };
-            weight = Math.min(weight + calcWeight(this._road[k - 1]) + calcWeight(this._road[k + 1]), 100);
-            let box = Math.random() * 100 < weight ? BlockType.BT_GOLD : this._road[k];
+            let posWeight = (k / this.roadLength) * 10 + 10; // 位置权重, [10, 20]
+
+            let weight = Math.min(calcWeight(this._road[k - 1]) + calcWeight(this._road[k + 1]), 80);
+
+            let ranNum = Math.random() * 100;
+            let box = ranNum < posWeight + weight ? BlockType.BT_GOLD : this._road[k];
+            this.probGold[k] = `${posWeight} + ${weight} = ${posWeight + weight} | ranNum: ${ranNum} | ${k}-box: ${box}`;
             this.goldNum += box === BlockType.BT_GOLD ? 1 : 0;
             this._road[k] = box;
         }
+
 
         // 创建地图
         for (let j = 0; j < this._road.length; j++)
@@ -206,6 +253,9 @@ export class GameManager extends Component
             this.rank.string = this.rankAcc.string = ""; // 重置评级文本
         if (this.EndTitle)
             this.EndTitle.string = ""; // 重置结束标题文本
+
+        if (this.debugMode)
+            this.printDebugInfo();
 
         setTimeout(() =>
         {      //直接设置active会直接开始监听鼠标事件，做了一下延迟处理
@@ -277,6 +327,12 @@ export class GameManager extends Component
         }, this.EndTitleAnim.getState("EndTitleMove").duration + 500);
     }
 
+    printDebugInfo()
+    {
+        for (let b of this.probGold)
+            console.log(`${b === undefined ? "AIR" : b}\n`);
+    }
+
     onStartButtonClicked()
     {
         if (this.ResetButton)
@@ -324,6 +380,22 @@ export class GameManager extends Component
             this.stepsLabel.string = '' + (moveIndex >= this.roadLength ? this.roadLength : moveIndex);
         }
         this.checkResult(moveIndex);
+    }
+
+    onDebugModeButtonClicked()
+    {
+        this.debugMode = !this.debugMode;
+        if (this.debugModeButton)
+        {
+            this.debugModeButton.string = this.debugMode ? "Debug[O]" : "Debug[X]";
+            this.debugModeButton.color = this.debugMode ? new math.Color(125, 125, 125, 255) :
+                new math.Color(65, 65, 65, 255);
+        }
+    }
+
+    onBGMButtonClicked()
+    {
+        this.BMGControl(!this.isBGMPlaying);
     }
 
     checkResult(moveIndex: number)
