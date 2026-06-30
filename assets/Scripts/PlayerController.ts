@@ -29,6 +29,7 @@ export class PlayerController extends Component
     {
         // input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
     }
+
     setInputActive(active: boolean) // PC端适配
     {
         if (active)

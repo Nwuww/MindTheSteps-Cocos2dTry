@@ -1,4 +1,4 @@
-import { _decorator, Button, CCInteger, Component, instantiate, Label, math, Node, Prefab, Vec3, Animation } from 'cc';
+import { _decorator, Button, CCInteger, Component, instantiate, Label, math, Node, Prefab, Vec3, Animation, UITransform, AudioSource, AudioClip } from 'cc';
 import { BLOCK_SIZE, PlayerController } from './PlayerController';
 import { ColorKey } from '../../extensions/plugin-import-2x/creator/components/ColorKey';
 const { ccclass, property } = _decorator;
@@ -71,11 +71,46 @@ export class GameManager extends Component
     public rankAcc: Label | null = null; // 评级数值文本
     private rankAccVal: number = 0; // 评级数值%
 
+    @property(AudioSource)
+    public bgm: AudioSource | null = null; // bgm
+    @property({ type: Label })
+    public bgmControl: Label | null = null; // bgm播放暂停
+    private isBGMPlaying: boolean = true;
+
     start()
     {
         this.debugMode = false;
         this.setCurState(GameState.GS_INIT);
+        this.ChangeResolution(1920, 1080);
+        this.BMGControl(true);
         this.playerCtrl?.node.on('JumpEnd', this.onPlayerJumpEnd, this);
+    }
+
+    BMGControl(isBGMON: boolean, volume: number = 1)
+    {
+        this.isBGMPlaying = isBGMON;
+        this.bgm.volume = volume;
+        if (isBGMON)
+        {
+            this.bgm.play();
+            this.bgmControl.string = "BGM[O]";
+            this.bgmControl.color = new math.Color(125, 125, 125, 255);
+        }
+        else
+        {
+            this.bgm.pause();
+            this.bgmControl.string = "BGM[X]";
+            this.bgmControl.color = new math.Color(65, 65, 65, 255);
+        }
+    }
+
+    ChangeResolution(width: number, height: number, anchorX?: number, anchorY?: number)
+    {
+        const uiTransform = this.getComponent(UITransform);
+        uiTransform.width = 200;
+        uiTransform.height = 120;
+        uiTransform.anchorX = anchorX !== undefined ? anchorX : 0;
+        uiTransform.anchorY = anchorY !== undefined ? anchorY : 0.5;
     }
 
     spawnBlockByType(type: BlockType)
@@ -126,25 +161,25 @@ export class GameManager extends Component
         // 随机添加绝赞地块
         this.goldNum = 0;
         let calcWeight = (box) => 
+        {
+            switch (box)
             {
-                switch (box)
-                {
-                    case BlockType.BT_STONE:
-                        return 25;
-                    case BlockType.BT_GOLD:
-                        return -15;
-                    case BlockType.BT_END:
-                        return 15;
-                    default:
-                        return -10;
-                }
-            };
+                case BlockType.BT_STONE:
+                    return 25;
+                case BlockType.BT_GOLD:
+                    return -15;
+                case BlockType.BT_END:
+                    return 15;
+                default:
+                    return -10;
+            }
+        };
         for (let k = 1; k < this.roadLength; k++)
         {
             if (this._road[k] === BlockType.BT_NONE)
                 continue;
             let posWeight = (k / this.roadLength) * 10 + 10; // 位置权重, [10, 20]
-            
+
             let weight = Math.min(calcWeight(this._road[k - 1]) + calcWeight(this._road[k + 1]), 80);
 
             let ranNum = Math.random() * 100;
@@ -153,7 +188,7 @@ export class GameManager extends Component
             this.goldNum += box === BlockType.BT_GOLD ? 1 : 0;
             this._road[k] = box;
         }
-        
+
 
         // 创建地图
         for (let j = 0; j < this._road.length; j++)
@@ -354,8 +389,13 @@ export class GameManager extends Component
         {
             this.debugModeButton.string = this.debugMode ? "Debug[O]" : "Debug[X]";
             this.debugModeButton.color = this.debugMode ? new math.Color(125, 125, 125, 255) :
-                                                             new math.Color(65, 65, 65, 255);
+                new math.Color(65, 65, 65, 255);
         }
+    }
+
+    onBGMButtonClicked()
+    {
+        this.BMGControl(!this.isBGMPlaying);
     }
 
     checkResult(moveIndex: number)
