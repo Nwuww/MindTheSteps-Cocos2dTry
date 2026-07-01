@@ -27,18 +27,18 @@ export class PlayerController extends Component
 
     start() 
     {
-        // input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+        // input.on(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
     }
 
     setInputActive(active: boolean) // PC端适配
     {
         if (active)
         {
-            input.on(Input.EventType.MOUSE_DOWN, this.onMouseUp, this);
+            input.on(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
         }
         else
         {
-            input.off(Input.EventType.MOUSE_DOWN, this.onMouseUp, this);
+            input.off(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
         }
     }
     // setInputActive(active: boolean) // 移动设备适配
@@ -55,7 +55,7 @@ export class PlayerController extends Component
     //     }
     // }
 
-    onMouseUp(event: EventMouse)
+    onMouseDown(event: EventMouse)
     {
         try
         {

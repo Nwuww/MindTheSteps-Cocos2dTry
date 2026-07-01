@@ -1,6 +1,7 @@
 import { _decorator, Button, CCInteger, Component, instantiate, Label, math, Node, Prefab, Vec3, Animation, UITransform, AudioSource, AudioClip } from 'cc';
 import { BLOCK_SIZE, PlayerController } from './PlayerController';
 import { ColorKey } from '../../extensions/plugin-import-2x/creator/components/ColorKey';
+import { NODE } from '../../extensions/plugin-import-2x/creator/components/Node';
 const { ccclass, property } = _decorator;
 
 enum BlockType
@@ -42,6 +43,9 @@ export class GameManager extends Component
 
     @property({ type: PlayerController })
     public playerCtrl: PlayerController | null = null; // 角色控制器
+
+    @property({ type: Node })
+    public counterNode: Node | null = null; // counter UI
     @property({ type: Label })
     public stepsLabel: Label | null = null; // 计步器
     @property({ type: Label })
@@ -80,6 +84,19 @@ export class GameManager extends Component
     @property(AudioSource)
     public sfx_btn: AudioSource | null = null; // btn sfx
 
+    @property({ type: Node })
+    public jpsNode: Node | null = null; // jps ui节点
+    @property({ type: Label })
+    public jps: Label | null = null; // 跳跃次数每秒
+    @property({ type: Label })
+    public timeUsing: Label | null = null; // 用时
+    private jumpTimes: number = 0; // 跳跃次数
+    private calcedJumps: number = 0; // 已计算的跳跃次数
+    private jpsVal: number = 0; // 跳跃次数每秒数值
+    private bestJps: number = 0; // 最佳跳跃次数每秒
+    private timer = { on: false, start: 0, end: 0, last: 0 }; // 计时器
+
+
     start()
     {
         this.debugMode = false;
@@ -110,8 +127,8 @@ export class GameManager extends Component
     ChangeResolution(width: number, height: number, anchorX?: number, anchorY?: number)
     {
         const uiTransform = this.getComponent(UITransform);
-        uiTransform.width = 200;
-        uiTransform.height = 120;
+        uiTransform.width = width;
+        uiTransform.height = height;
         uiTransform.anchorX = anchorX !== undefined ? anchorX : 0;
         uiTransform.anchorY = anchorY !== undefined ? anchorY : 0.5;
     }
@@ -229,6 +246,10 @@ export class GameManager extends Component
             this.endMenu.active = false;
         if (this.startMenu)
             this.startMenu.active = true;
+        if (this.counterNode)
+            this.counterNode.active = false;
+        if (this.jpsNode)
+            this.jpsNode.active = false;
 
         this.stepsLabel.string = '0';   // 将步数重置为0
 
@@ -245,11 +266,20 @@ export class GameManager extends Component
     {
         if (this.startMenu || this.endMenu)
             this.startMenu.active = this.endMenu.active = false;
+        if (this.counterNode)
+            this.counterNode.active = true;
+        if (this.jpsNode)
+            this.jpsNode.active = true;
 
         if (this.stepsLabel)
             this.stepsLabel.string = '0';   // 将步数重置为0
 
         this.goldGet = 0; // 重置已获取绝赞地块数量
+        this.jpsVal = 0; // 重置跳跃次数每秒数值
+        this.calcedJumps = 0; // 重置已计算的跳跃次数
+        this.timer.start = this.timer.end = 0; // 重置计时器
+        this.timer.on = false;
+
 
         this.rankAccVal = 0; // 重置评级
         if (this.rank)
@@ -273,6 +303,13 @@ export class GameManager extends Component
     {
         if (this.endMenu)
             this.endMenu.active = true;
+        if (this.startMenu)
+            this.startMenu.active = false;
+        if (this.counterNode)
+            this.counterNode.active = false;
+        if (this.jpsNode)
+            this.jpsNode.active = false;
+
         if (this.playerCtrl)
         {
             this.playerCtrl.setInputActive(false);
@@ -306,18 +343,25 @@ export class GameManager extends Component
                 this.rank.string = "SS";
             else if (this.rankAccVal < 100)
                 this.rank.string = "SS+";
-            else if (this.rankAccVal < 100.5)
+            else if (this.rankAccVal < 100.75)
             {
                 this.rank.string = "SSS";
                 this.rank.color = new math.Color(172, 255, 126, 255); // green
                 this.rankAcc.color = new math.Color(172, 255, 126, 255);
                 f = true;
             }
-            else 
+            else if (this.rankAccVal < 101)
             {
                 this.rank.string = "SSS+";
                 this.rank.color = new math.Color(255, 146, 46, 255); // gold
                 this.rankAcc.color = new math.Color(255, 146, 46, 255);
+                f = true;
+            }
+            else 
+            {
+                this.rank.string = "SSS+";
+                this.rank.color = new math.Color(255, 66, 66, 255); // red
+                this.rankAcc.color = new math.Color(255, 66, 66, 255);
                 f = true;
             }
 
@@ -390,10 +434,18 @@ export class GameManager extends Component
 
     onPlayerJumpEnd(moveIndex: number)
     {
+        if (!this.timer.on)
+        {
+            this.timer.on = true;
+            this.timer.start = Date.now(); // 开始计时
+            this.timer.last = this.timer.start;
+        }
+
         if (this.stepsLabel)
         {
             this.stepsLabel.string = '' + (moveIndex >= this.roadLength ? this.roadLength : moveIndex);
         }
+        this.jumpTimes++;
         this.checkResult(moveIndex);
     }
 
@@ -423,23 +475,36 @@ export class GameManager extends Component
         if (moveIndex >= this.roadLength || this._road[moveIndex] === BlockType.BT_END)
         {
             // 胜利
+            this.timer.end = Date.now(); // 结束计时
+            this.timer.on = false;
+            this.timer.last = 0;
+
             this.bestSteps = this.roadLength;
             if (this.bestStepsLabel)
                 this.bestStepsLabel.string = "Best: CLEARED!";
 
             this.rankAccVal = (moveIndex / this.roadLength) * 100 + (this.goldGet / this.goldNum); // 计算完成度
+            const totTime = (this.timer.end - this.timer.start) / 1000;
+            this.jpsVal = totTime > 0.1 ? this.jumpTimes / totTime : 0; // 计算平均jps
+
             this.EndTitle.string = "CLEAR!";
             this.setCurState(GameState.GS_END);
         }
         else if (this._road[moveIndex] === BlockType.BT_NONE)
         {
             // 失败
+            this.timer.end = Date.now(); // 结束计时
+            this.timer.on = false;
+
             if (moveIndex > this.bestSteps)
                 this.bestSteps = moveIndex;
             if (this.bestStepsLabel)
                 this.bestStepsLabel.string = this.bestSteps == this.roadLength ? "Best: CLEARED!" : "Best: " + this.bestSteps;
 
             this.rankAccVal = (moveIndex / this.roadLength) * 100 + (this.goldGet / this.goldNum); // 计算完成度
+            const totTime = (this.timer.end - this.timer.start) / 1000;
+            this.jpsVal = totTime > 0.1 ? this.jumpTimes / totTime : 0; // 计算平均jps
+
             this.EndTitle.string = "Game Over!";
             this.setCurState(GameState.GS_END);
 
@@ -448,7 +513,45 @@ export class GameManager extends Component
 
     update(deltaTime: number)
     {
+        if (this.jps)
+            this.updateJPS();
+    }
 
+    updateJPS()
+    {
+        if (this.timer.on) // 已经开始计时
+        {
+            let totTime = (Date.now() - this.timer.start) / 1000;
+            let elapsedTime = (Date.now() - this.timer.last) / 1000;
+            this.timeUsing.string = totTime.toFixed(2) + "s"; // 显示用时
+            if (elapsedTime >= 5) // 每5秒更新一次jps
+            {
+                this.jpsVal = (this.jumpTimes - this.calcedJumps) / elapsedTime; // 计算jps
+                if (this.jpsVal > this.bestJps) // 更新最佳jps
+                    this.bestJps = this.jpsVal;
+
+                this.jps.string = this.jpsVal.toFixed(2) + "/" + this.bestJps.toFixed(2); // 显示jps/bjps
+
+                this.calcedJumps = this.jumpTimes;
+                this.timer.last = Date.now(); // 重置计时器区间
+            }
+            else if (elapsedTime > 1 && elapsedTime < 5) // 每0.1秒更新一次jps显示
+            {
+                this.jpsVal = (this.jumpTimes - this.calcedJumps) / elapsedTime; // 计算jps
+                if (this.jpsVal > this.bestJps) // 更新最佳jps
+                    this.bestJps = this.jpsVal;
+
+                this.jps.string = this.jpsVal.toFixed(2) + "/" + this.bestJps.toFixed(2); // 显示jps/bjps
+
+                this.calcedJumps = this.jumpTimes;
+                this.timer.last = Date.now(); // 重置计时器区间
+            }
+        }
+        else // 还没开始计时
+        {
+            this.jps.string = "";
+            this.timeUsing.string = "0s";
+        }
     }
 }
 
