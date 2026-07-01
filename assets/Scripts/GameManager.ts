@@ -77,6 +77,9 @@ export class GameManager extends Component
     public bgmControl: Label | null = null; // bgm播放暂停
     private isBGMPlaying: boolean = true;
 
+    @property(AudioSource)
+    public sfx_btn: AudioSource | null = null; // btn sfx
+
     start()
     {
         this.debugMode = false;
@@ -335,8 +338,9 @@ export class GameManager extends Component
 
     onStartButtonClicked()
     {
-        if (this.ResetButton)
+        if (this.StartButton)
         {
+            this.sfx_btn.play();
             this.ResetButton.string = "Reset";
             this.ResetButton.color = new math.Color(255, 73, 73, 255);
         }
@@ -348,8 +352,9 @@ export class GameManager extends Component
         this.bestSteps = 0;
         if (this.bestStepsLabel)
             this.bestStepsLabel.string = "No Record!";
-        if (this.ResetButton)
+        if (this.ResetButton && this.ResetButton.string !== "Start a New Game!")
         {
+            this.sfx_btn.play();
             this.ResetButton.string = "Start a New Game!";
             this.ResetButton.color = new math.Color(90, 63, 63, 255);
         }
@@ -357,20 +362,30 @@ export class GameManager extends Component
 
     onBackToMenuButtonClicked()
     {
-        if (this.EndTitle)
-            this.EndTitle.string = "";
-        if (this.rank)
-            this.rank.string = "";
-        this.setCurState(GameState.GS_INIT);
+        if (this.BackToMenu)
+        {
+            this.sfx_btn.play();
+            if (this.EndTitle)
+                this.EndTitle.string = "";
+            if (this.rank)
+                this.rank.string = "";
+            this.setCurState(GameState.GS_INIT);
+        }
+
     }
 
     onRestartButtonClicked()
     {
-        if (this.EndTitle)
-            this.EndTitle.string = "";
-        if (this.rank)
-            this.rank.string = "";
-        this.setCurState(GameState.GS_PLAYING);
+        if (this.ReplayMap)
+        {
+            this.sfx_btn.play();
+            if (this.EndTitle)
+                this.EndTitle.string = "";
+            if (this.rank)
+                this.rank.string = "";
+            this.setCurState(GameState.GS_PLAYING);
+        }
+
     }
 
     onPlayerJumpEnd(moveIndex: number)
@@ -387,6 +402,7 @@ export class GameManager extends Component
         this.debugMode = !this.debugMode;
         if (this.debugModeButton)
         {
+            this.sfx_btn.play();
             this.debugModeButton.string = this.debugMode ? "Debug[O]" : "Debug[X]";
             this.debugModeButton.color = this.debugMode ? new math.Color(125, 125, 125, 255) :
                 new math.Color(65, 65, 65, 255);
@@ -395,6 +411,7 @@ export class GameManager extends Component
 
     onBGMButtonClicked()
     {
+        this.sfx_btn.play();
         this.BMGControl(!this.isBGMPlaying);
     }
 
